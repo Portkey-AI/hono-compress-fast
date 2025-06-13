@@ -1,0 +1,44 @@
+{
+  "name": "hono-compress-fast",
+  "version": "0.1.0",
+  "description": "Ultra-light Brotli / gzip compression middleware for Hono, optimised for Node.js but portable to browsers & workers.",
+  "keywords": ["hono", "middleware", "brotli", "compression", "http", "node"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/portkey-ai/hono-compress-fast.git"
+  },
+  "author": "Rohit Agarwal <hello@portkey.io>",
+  "engines": { "node": ">=18" },
+  "type": "module",                
+  "main": "./dist/index.js",       
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist"],
+  "peerDependencies": {
+    "hono": ">=4"
+  },
+  "scripts": {
+    "build": "tsup hono-compress-fast.ts --dts --format esm,cjs --clean",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "prepublishOnly": "npm run build && npm test && npm run lint"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.5",
+    "tsup": "^8",
+    "vitest": "^1",
+    "eslint": "^9",
+    "eslint-config-prettier": "^9",
+    "prettier": "^3"
+  }
+}
