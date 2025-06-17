@@ -79,6 +79,37 @@ export function compressFast (opts: CompressFastOptions = {}): MiddlewareHandler
     const len = Number(res.headers.get('Content-Length') || 0)
     if (len && len < threshold) return
 
+    // skip empty-body statuses & HEAD
+    if (
+      c.req.method === 'HEAD' ||
+      res.status === 204 ||
+      res.status === 304 ||
+      res.status === 101
+    ) return
+
+    // skip Range requests
+    if (c.req.header('Range')) return
+
+    // skip obviously pre-compressed media
+    const compressible = /^(text\/|application\/(json|xml|javascript|wasm|xhtml))/
+    if (!compressible.test(ctype)) return  // leave images, zips, etc. alone
+
+    // set/merge Vary
+    const vary = res.headers.get('Vary')
+    res.headers.set(
+      'Vary',
+      vary?.includes('Accept-Encoding')
+        ? vary
+        : vary
+          ? vary + ', Accept-Encoding'
+          : 'Accept-Encoding'
+    )
+
+    // weaken strong ETag (optional)
+    const etag = res.headers.get('ETag')
+    if (etag && !etag.startsWith('W/')) res.headers.set('ETag', `W/${etag}`)
+
+
     // ---------------- Node path: native Brotli -----------------------
     if (encoder === 'br' && isNode && zlib) {
       const brotli = zlib.createBrotliCompress({
