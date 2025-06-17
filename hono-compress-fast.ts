@@ -1,9 +1,11 @@
 /*
  * hono-compress-fast.ts
- * A minimal, high‑throughput compression middleware for Hono that
- * prefers Node.js' native Brotli implementation when available and
- * otherwise falls back to the Web Compression Streams API (gzip/deflate).
- *
+ * -------------------------------------------------------------------
+ * Ultra‑light compression middleware for Hono.
+ * • Node.js ⇒ native Brotli (zlib) → fastest throughput
+ * • Other runtimes ⇒ Web CompressionStream (gzip / deflate)
+ * • Automatically skips Server‑Sent Events (text/event-stream) unless
+ *   explicitly overridden.
  * Usage (Node 18+):
  *
  *   import { Hono } from 'hono'
@@ -22,16 +24,14 @@ import type { MiddlewareHandler } from 'hono'
 // -----------------------------------------------------------------------
 
 export interface CompressFastOptions {
-  /** Minimum body size (bytes) before compression kicks in. Default: 1024 */
+  /** Minimum body size (bytes) before compression kicks in. Default: 1024 */
   threshold?: number
   /** Ordered list of encodings to negotiate. First match wins. */
   encodings?: Array<'br' | 'gzip' | 'deflate'>
-  /** Brotli quality (0‑11) – only honoured on Node. Default: 5 */
+  /** Brotli quality (0‑11). Node only. Default: 4 */
   brotliQuality?: number
-  /** gzip compression level (0‑9) – **placeholder** (CompressionStream ignores it). */
-  gzipLevel?: number
-  /** deflate compression level (0‑9) – **placeholder**. */
-  deflateLevel?: number
+  /** Compress Server‑Sent Event streams? Default: **false** */
+  compressEventStream?: boolean
 }
 
 /**
@@ -43,7 +43,8 @@ export function compressFast (opts: CompressFastOptions = {}): MiddlewareHandler
   const {
     threshold = 1024,
     encodings = ['br', 'gzip', 'deflate'],
-    brotliQuality = 5
+    brotliQuality = 4,
+    compressEventStream = false
   } = opts
 
   // Helper: pick the first mutually‑supported encoding
@@ -68,6 +69,10 @@ export function compressFast (opts: CompressFastOptions = {}): MiddlewareHandler
     const res = c.res
     if (!res.body || res.headers.has('Content-Encoding')) return
 
+    // ---- Skip Server‑Sent Events (they need immediate flush) ---------
+    const ctype = (res.headers.get('Content-Type') || '').toLowerCase()
+    if (!compressEventStream && ctype.startsWith('text/event-stream')) return
+
     const encoder = negotiate(c.req.header('Accept-Encoding') || '')
     if (!encoder) return
 
@@ -83,8 +88,8 @@ export function compressFast (opts: CompressFastOptions = {}): MiddlewareHandler
       })
 
       const compressed = (res.body as any).pipe
-        ? (res.body as any).pipe(brotli) // Node stream
-        : brotli                         // already a Transform
+        ? (res.body as any).pipe(brotli)
+        : brotli
 
       res.headers.set('Content-Encoding', 'br')
       res.headers.delete('Content-Length')
